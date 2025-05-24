@@ -27,4 +27,26 @@ A scalable microservices-based order processing system built using Spring Boot a
 ---
 
 ## 🧩 Architecture Diagram
+Client
+  |
+  |-- POST /order
+  ↓
+API Gateway
+  ↓
+Web Server
+  ↓
+Order Service
+  |--→ Kafka: Order Topic
+  ↓
+Order Data Service ←→ Redis Cache
+     |
+     ↓
+ Order DB
+
+Kafka Consumers:
+--------------------------------------------
+Order Topic       → Inventory Service
+Inventory Topic   → Transaction Service
+Shipping Topic    → Shipping Service → Amazon SES
+
 
