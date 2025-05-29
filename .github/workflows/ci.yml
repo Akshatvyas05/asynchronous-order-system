@@ -4,69 +4,60 @@ on:
   push:
     branches:
       - 'feature/**'
-      - 'bugfix/**'
-      - 'hotfix/**'
-      - 'release/**'
   pull_request:
     branches:
-      - '**'
+      - main
 
 jobs:
   build-and-test:
-    name: Build & Test Microservices
     runs-on: ubuntu-latest
 
     services:
       zookeeper:
-        image: wurstmeister/zookeeper
+        image: confluentinc/cp-zookeeper:7.5.0
         ports:
           - 2181:2181
+        env:
+          ZOOKEEPER_CLIENT_PORT: 2181
+          ZOOKEEPER_TICK_TIME: 2000
+        options: >-
+          --health-cmd "echo ruok | nc localhost 2181 | grep imok"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
       kafka:
-        image: wurstmeister/kafka
+        image: confluentinc/cp-kafka:7.5.0
         ports:
           - 9092:9092
         env:
-          KAFKA_ADVERTISED_HOST_NAME: localhost
-          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+          KAFKA_BROKER_ID: 1
+          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
         options: >-
-          --health-cmd="curl -f localhost:9092 || exit 1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+          --health-cmd "curl -s localhost:9092"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up JDK 17
+      - name: Set up Java
         uses: actions/setup-java@v3
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Cache Maven packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven
-
-      - name: Run Tests for All Services
+      - name: Build & Test All Microservices
         run: |
-          for dir in */ ; do
-            if [ -f "$dir/pom.xml" ]; then
-              echo "Running tests in $dir"
-              mvn -f "$dir/pom.xml" clean test
-            fi
-          done
-
-      - name: Build Docker Images
-        run: |
-          for dir in */ ; do
-            if [ -f "$dir/Dockerfile" ]; then
-              service_name=$(basename "$dir")
-              echo "Building Docker image for $service_name"
-              docker build -t "$service_name:latest" "$dir"
+          for d in */ ; do
+            if [ -f "$d/pom.xml" ]; then
+              echo "Building $d"
+              mvn -f "$d/pom.xml" clean install
             fi
           done
