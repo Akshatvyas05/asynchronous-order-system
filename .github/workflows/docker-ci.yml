@@ -1,0 +1,40 @@
+name: Docker CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'feature/**'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract commit SHA
+        id: vars
+        run: echo "SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Build and tag Docker image
+        run: |
+          IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/async-order
+          docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:${{ env.SHA }} .
+
+      - name: Push Docker image
+        run: |
+          IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-microservice
+          docker push $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:${{ env.SHA }}
